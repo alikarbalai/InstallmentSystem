@@ -64,7 +64,7 @@ builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProv
 builder.Services.AddScoped<IAuthorizationHandler, PermissionHandler>();
 
 builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddScoped<IBillService, BillService>();
+builder.Services.AddScoped<IContractService, ContractService>();
 
 builder.Services.AddCors(options =>
 {

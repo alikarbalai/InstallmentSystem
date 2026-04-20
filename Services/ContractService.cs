@@ -11,14 +11,14 @@ using System.Collections.Generic;
 
 namespace InstallmentSystem.Services;
 
-public class BillService : IBillService
+public class ContractService : IContractService
 {
     private readonly AppDbContext _db;
 
-    public BillService(AppDbContext db) => _db = db;
+    public ContractService(AppDbContext db) => _db = db;
 
-    // ─── Create Bill ──────────────────────────────────────────────────────
-    public async Task<InstallmentBill> CreateBillAsync(CreateBillDto dto)
+    // ─── Create Contract ──────────────────────────────────────────────────────
+    public async Task<InstallmentContract> CreateContractAsync(CreateContractDto dto)
     {
         var currency = await _db.Currencies.FindAsync(dto.CurrencyId)
             ?? throw new NotFoundException("العملة غير موجودة");
@@ -32,29 +32,29 @@ public class BillService : IBillService
         var installmentVal = dto.InstallmentCount > 0 ? remaining / dto.InstallmentCount : 0;
         var amountInBase   = totalAmount * currency.ExchangeRate;
 
-        var bill = new InstallmentBill
+        var contract = new InstallmentContract
         {
             CustomerId       = dto.CustomerId,
             CurrencyId       = dto.CurrencyId,
             ExchangeRate     = currency.ExchangeRate,
-            BillNumber       = $"BIL-{DateTime.UtcNow:yyyyMMddHHmmss}",
-            BillDate         = dto.BillDate,
+            ContractNumber   = $"CNT-{DateTime.UtcNow:yyyyMMddHHmmss}",
+            ContractDate     = dto.ContractDate,
             TotalAmount      = totalAmount,
             TotalAmountInBase= amountInBase,
             DownPayment      = dto.DownPayment,
             RemainingAmount  = remaining,
             InstallmentCount = dto.InstallmentCount,
             InstallmentValue = installmentVal,
-            Status           = BillStatus.Active,
+            Status           = ContractStatus.Active,
             CreatedAt        = DateTime.UtcNow
         };
 
         for (int i = 1; i <= dto.InstallmentCount; i++)
         {
-            bill.Installments.Add(new Installment
+            contract.Installments.Add(new Installment
             {
                 InstallmentNumber = i,
-                DueDate           = dto.BillDate.AddMonths(i),
+                DueDate           = dto.ContractDate.AddMonths(i),
                 Amount            = installmentVal,
                 RemainingAmount   = installmentVal,
                 Status            = InstallmentStatus.Pending
@@ -63,7 +63,7 @@ public class BillService : IBillService
 
         foreach (var item in dto.Items)
         {
-            bill.ContractItems.Add(new ContractItem
+            contract.ContractItems.Add(new ContractItem
             {
                 ProductId = item.ProductId,
                 Quantity  = item.Quantity,
@@ -71,9 +71,9 @@ public class BillService : IBillService
             });
         }
 
-        _db.InstallmentBills.Add(bill);
+        _db.InstallmentContracts.Add(contract);
 
-        // ── Revenue Recognition (استحقاق الفاتورة) ──
+        // ── Revenue Recognition (استحقاق العقد) ──
         // من حساب ذمم العملاء (102) إلى المبيعات / الإيرادات (401)
         var clientAccount = await _db.Accounts.FirstOrDefaultAsync(a => a.Code == "102") 
             ?? throw new NotFoundException("حساب ذمم العملاء غير موجود بالنظام (102)");
@@ -81,32 +81,32 @@ public class BillService : IBillService
         var revenueAccount = await _db.Accounts.FirstOrDefaultAsync(a => a.Code == "401") 
             ?? throw new NotFoundException("حساب الإيرادات غير موجود بالنظام (401)");
 
-        var billJournal = new JournalEntry
+        var contractJournal = new JournalEntry
         {
             EntryNumber = $"JNL-{DateTime.UtcNow:yyyyMMddHHmmss}",
             EntryDate   = DateTime.UtcNow,
-            Description = $"اثبات ذمة مالية للفاتورة رقم {bill.BillNumber} للعميل {customer.FullName}",
+            Description = $"اثبات ذمة مالية للعقد رقم {contract.ContractNumber} للعميل {customer.FullName}",
             Type        = JournalEntryType.ContractIssue,
-            CurrencyId  = bill.CurrencyId,
-            ExchangeRate= bill.ExchangeRate,
+            CurrencyId  = contract.CurrencyId,
+            ExchangeRate= contract.ExchangeRate,
             Details     = new List<JournalEntryDetail>
             {
                 new() { AccountId = clientAccount.Id, Debit = amountInBase, Credit = 0 },
                 new() { AccountId = revenueAccount.Id, Debit = 0, Credit = amountInBase }
             }
         };
-        _db.JournalEntries.Add(billJournal);
+        _db.JournalEntries.Add(contractJournal);
 
         // حفظ واحد شامل للجميع كمعاملة واحدة
         await _db.SaveChangesAsync();
-        return bill;
+        return contract;
     }
 
     // ─── Process Payment + Create Receipt + Journal Entry ─────────────────────
     public async Task<Payment> ProcessPaymentAsync(CreatePaymentDto dto)
     {
         var installment = await _db.Installments
-            .Include(i => i.Bill)
+            .Include(i => i.Contract)
             .FirstOrDefaultAsync(i => i.Id == dto.InstallmentId)
             ?? throw new NotFoundException("القسط غير موجود");
 
@@ -116,17 +116,17 @@ public class BillService : IBillService
         if (dto.Amount > installment.RemainingAmount)
             throw new ValidationException("المبلغ أكبر من المتبقي على هذا القسط");
 
-        // Use Bill's Currency instead of dto.CurrencyId
-        var billCurrency = await _db.Currencies.FindAsync(installment.Bill.CurrencyId)
-            ?? throw new NotFoundException("عملة الفاتورة غير موجودة");
+        // Use Contract's Currency instead of dto.CurrencyId
+        var contractCurrency = await _db.Currencies.FindAsync(installment.Contract.CurrencyId)
+            ?? throw new NotFoundException("عملة العقد غير موجودة");
 
-        var amountInBase = dto.Amount * billCurrency.ExchangeRate;
+        var amountInBase = dto.Amount * contractCurrency.ExchangeRate;
         
         // ── Payment ──
         var payment = new Payment
         {
             CustomerId    = dto.CustomerId,
-            ContractId    = installment.BillId,
+            ContractId    = installment.ContractId,
             InstallmentId = dto.InstallmentId,
             Amount        = dto.Amount,
             PaymentDate   = DateTime.UtcNow,
@@ -141,9 +141,9 @@ public class BillService : IBillService
         if (installment.Status == InstallmentStatus.Paid)
             installment.PaymentDate = DateTime.UtcNow;
 
-        installment.Bill.RemainingAmount -= dto.Amount;
-        if (installment.Bill.RemainingAmount <= 0)
-            installment.Bill.Status = BillStatus.Paid;
+        installment.Contract.RemainingAmount -= dto.Amount;
+        if (installment.Contract.RemainingAmount <= 0)
+            installment.Contract.Status = ContractStatus.Completed;
 
         _db.Payments.Add(payment);
 
@@ -154,10 +154,10 @@ public class BillService : IBillService
             ReceiptNumber = receiptNumber,
             PaymentId     = payment.Id, 
             CustomerId    = dto.CustomerId,
-            CurrencyId    = installment.Bill.CurrencyId, // Force bill currency
+            CurrencyId    = installment.Contract.CurrencyId, // Force contract currency
             Amount        = dto.Amount,
             AmountInBase  = amountInBase,
-            ExchangeRate  = billCurrency.ExchangeRate,
+            ExchangeRate  = contractCurrency.ExchangeRate,
             PaymentMethod = dto.PaymentMethod,
             Notes         = dto.Notes,
             ReceiptDate   = DateTime.UtcNow
@@ -203,7 +203,7 @@ public class BillService : IBillService
     public async Task CancelPaymentAsync(Guid paymentId, string? reason)
     {
         var payment = await _db.Payments
-            .Include(p => p.Installment).ThenInclude(i => i.Bill)
+            .Include(p => p.Installment).ThenInclude(i => i.Contract)
             .Include(p => p.Receipt).ThenInclude(r => r!.JournalEntry)
             .FirstOrDefaultAsync(p => p.Id == paymentId)
             ?? throw new NotFoundException("الدفعة غير موجودة");
@@ -223,9 +223,9 @@ public class BillService : IBillService
             payment.Installment.PaidAmount <= 0 ? InstallmentStatus.Pending : InstallmentStatus.PartiallyPaid;
         payment.Installment.PaymentDate      = null;
 
-        payment.Installment.Bill.RemainingAmount += payment.Amount;
-        if (payment.Installment.Bill.Status == BillStatus.Paid)
-            payment.Installment.Bill.Status = BillStatus.Active;
+        payment.Installment.Contract.RemainingAmount += payment.Amount;
+        if (payment.Installment.Contract.Status == ContractStatus.Completed)
+            payment.Installment.Contract.Status = ContractStatus.Active;
 
         // ── Cancel Receipt ──
         if (payment.Receipt != null)
@@ -279,58 +279,58 @@ public class BillService : IBillService
         await _db.SaveChangesAsync();
     }
 
-    // ─── Delete Bill (Cascade) ────────────────────────────────────────────
-    public async Task DeleteBillAsync(Guid id)
+    // ─── Delete Contract (Cascade) ────────────────────────────────────────────
+    public async Task DeleteContractAsync(Guid id)
     {
         // استخدام Transaction لضمان سلامة البيانات
         using var transaction = await _db.Database.BeginTransactionAsync();
         try
         {
-            var bill = await _db.InstallmentBills
+            var contract = await _db.InstallmentContracts
                 .FirstOrDefaultAsync(c => c.Id == id)
-                ?? throw new NotFoundException("الفاتورة غير موجودة");
+                ?? throw new NotFoundException("العقد غير موجود");
 
-            // 1. مسح تفاصيل القيود الخاصة بدفعات الفاتورة
+            // 1. مسح تفاصيل القيود الخاصة بدفعات العقد
             await _db.Database.ExecuteSqlRawAsync(@"
                 ;DELETE jed
                 FROM JournalEntryDetails jed
                 INNER JOIN JournalEntries je ON jed.JournalEntryId = je.Id
                 INNER JOIN Receipts r ON je.ReceiptId = r.Id
                 INNER JOIN Payments p ON r.PaymentId = p.Id
-                WHERE p.BillId = {0};", id);
+                WHERE p.ContractId = {0};", id);
 
-            // 2. مسح القيود الخاصة بدفعات الفاتورة
+            // 2. مسح القيود الخاصة بدفعات العقد
             await _db.Database.ExecuteSqlRawAsync(@"
                 ;DELETE je
                 FROM JournalEntries je
                 INNER JOIN Receipts r ON je.ReceiptId = r.Id
                 INNER JOIN Payments p ON r.PaymentId = p.Id
-                WHERE p.BillId = {0};", id);
+                WHERE p.ContractId = {0};", id);
 
-            // 3. مسح تفاصيل قيد إنشاء الفاتورة
+            // 3. مسح تفاصيل قيد إنشاء العقد
             await _db.Database.ExecuteSqlRawAsync(@"
                 ;DELETE jed
                 FROM JournalEntryDetails jed
                 INNER JOIN JournalEntries je ON jed.JournalEntryId = je.Id
-                WHERE je.Type = 'ContractIssue' AND je.Description LIKE '%' + {0} + '%';", bill.BillNumber);
+                WHERE je.Type = 'ContractIssue' AND je.Description LIKE '%' + {0} + '%';", contract.ContractNumber);
 
-            // 4. مسح قيد إنشاء الفاتورة
+            // 4. مسح قيد إنشاء العقد
             await _db.Database.ExecuteSqlRawAsync(@"
                 ;DELETE FROM JournalEntries 
-                WHERE Type = 'ContractIssue' AND Description LIKE '%' + {0} + '%';", bill.BillNumber);
+                WHERE Type = 'ContractIssue' AND Description LIKE '%' + {0} + '%';", contract.ContractNumber);
 
-            // 5. مسح وصولات الفاتورة
+            // 5. مسح وصولات العقد
             await _db.Database.ExecuteSqlRawAsync(@"
                 ;DELETE r
                 FROM Receipts r
                 INNER JOIN Payments p ON r.PaymentId = p.Id
-                WHERE p.BillId = {0};", id);
+                WHERE p.ContractId = {0};", id);
 
-            // 6. مسح الدفعات والأقساط والمواد والفاتورة
-            await _db.Database.ExecuteSqlRawAsync(";DELETE FROM Payments WHERE BillId = {0};", id);
-            await _db.Database.ExecuteSqlRawAsync(";DELETE FROM Installments WHERE BillId = {0};", id);
-            await _db.Database.ExecuteSqlRawAsync(";DELETE FROM BillItems WHERE BillId = {0};", id);
-            await _db.Database.ExecuteSqlRawAsync(";DELETE FROM InstallmentBills WHERE Id = {0};", id);
+            // 6. مسح الدفعات والأقساط والمواد والعقد
+            await _db.Database.ExecuteSqlRawAsync(";DELETE FROM Payments WHERE ContractId = {0};", id);
+            await _db.Database.ExecuteSqlRawAsync(";DELETE FROM Installments WHERE ContractId = {0};", id);
+            await _db.Database.ExecuteSqlRawAsync(";DELETE FROM ContractItems WHERE ContractId = {0};", id);
+            await _db.Database.ExecuteSqlRawAsync(";DELETE FROM InstallmentContracts WHERE Id = {0};", id);
 
             await transaction.CommitAsync();
         }

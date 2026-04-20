@@ -16,12 +16,12 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<GroupPermission> GroupPermissions { get; set; }
     public DbSet<Customer> Customers { get; set; }
     public DbSet<Currency> Currencies { get; set; }
-    public DbSet<InstallmentBill> InstallmentBills { get; set; }
+    public DbSet<InstallmentContract> InstallmentContracts { get; set; }
     public DbSet<Installment> Installments { get; set; }
     public DbSet<Payment> Payments { get; set; }
     public DbSet<Receipt> Receipts { get; set; }
     public DbSet<Product> Products { get; set; }
-    public DbSet<BillItem> BillItems { get; set; }
+    public DbSet<ContractItem> ContractItems { get; set; }
     public DbSet<Account> Accounts { get; set; }
     public DbSet<JournalEntry> JournalEntries { get; set; }
     public DbSet<JournalEntryDetail> JournalEntryDetails { get; set; }
@@ -50,14 +50,14 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             .HasIndex(c => c.Code).IsUnique();
 
         // ── Enums String Conversions ──
-        modelBuilder.Entity<InstallmentBill>().Property(c => c.Status).HasConversion<string>();
+        modelBuilder.Entity<InstallmentContract>().Property(c => c.Status).HasConversion<string>();
         modelBuilder.Entity<Installment>().Property(i => i.Status).HasConversion<string>();
         modelBuilder.Entity<Payment>().Property(p => p.PaymentMethod).HasConversion<string>();
         modelBuilder.Entity<Receipt>().Property(r => r.PaymentMethod).HasConversion<string>();
         modelBuilder.Entity<JournalEntry>().Property(j => j.Type).HasConversion<string>();
 
         // ── Concurrency Tokens ──
-        modelBuilder.Entity<InstallmentBill>().Property(c => c.RowVersion).IsRowVersion();
+        modelBuilder.Entity<InstallmentContract>().Property(c => c.RowVersion).IsRowVersion();
         modelBuilder.Entity<Installment>().Property(i => i.RowVersion).IsRowVersion();
 
         // ── Receipt → Payment (one-to-one) ──
@@ -95,9 +95,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             .OnDelete(DeleteBehavior.NoAction);
 
         modelBuilder.Entity<Payment>()
-            .HasOne(p => p.Bill)
+            .HasOne(p => p.Contract)
             .WithMany(c => c.Payments)
-            .HasForeignKey(p => p.BillId)
+            .HasForeignKey(p => p.ContractId)
             .OnDelete(DeleteBehavior.NoAction);
 
         modelBuilder.Entity<Payment>()
@@ -106,36 +106,36 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
             .HasForeignKey(p => p.InstallmentId)
             .OnDelete(DeleteBehavior.NoAction);
 
-        // ── BillItem cascades ──
-        modelBuilder.Entity<BillItem>()
-            .HasOne(ci => ci.Bill)
-            .WithMany(c => c.BillItems)
-            .HasForeignKey(ci => ci.BillId)
+        // ── ContractItem cascades ──
+        modelBuilder.Entity<ContractItem>()
+            .HasOne(ci => ci.Contract)
+            .WithMany(c => c.ContractItems)
+            .HasForeignKey(ci => ci.ContractId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<BillItem>()
+        modelBuilder.Entity<ContractItem>()
             .HasOne(ci => ci.Product)
-            .WithMany(p => p.BillItems)
+            .WithMany(p => p.ContractItems)
             .HasForeignKey(ci => ci.ProductId)
             .OnDelete(DeleteBehavior.NoAction);
 
         // ── Installment cascades ──
         modelBuilder.Entity<Installment>()
-            .HasOne(i => i.Bill)
+            .HasOne(i => i.Contract)
             .WithMany(c => c.Installments)
-            .HasForeignKey(i => i.BillId)
+            .HasForeignKey(i => i.ContractId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // ── InstallmentBill cascades ──
-        modelBuilder.Entity<InstallmentBill>()
+        // ── InstallmentContract cascades ──
+        modelBuilder.Entity<InstallmentContract>()
             .HasOne(c => c.Customer)
-            .WithMany(cu => cu.Bills)
+            .WithMany(cu => cu.Contracts)
             .HasForeignKey(c => c.CustomerId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<InstallmentBill>()
+        modelBuilder.Entity<InstallmentContract>()
             .HasOne(c => c.Currency)
-            .WithMany(cu => cu.Bills)
+            .WithMany(cu => cu.Contracts)
             .HasForeignKey(c => c.CurrencyId)
             .OnDelete(DeleteBehavior.NoAction);
 

@@ -3,11 +3,11 @@ using InstallmentSystem.Models;
 
 namespace InstallmentSystem.Services;
 
-public interface IBillService
+public interface IContractService
 {
-    Task<InstallmentBill> CreateBillAsync(CreateBillDto dto);
+    Task<InstallmentContract> CreateContractAsync(CreateContractDto dto);
     Task<Payment> ProcessPaymentAsync(CreatePaymentDto dto);
     Task CancelPaymentAsync(Guid paymentId, string? reason);
     Task UpdateOverdueInstallmentsAsync();
-    Task DeleteBillAsync(Guid id);
+    Task DeleteContractAsync(Guid id);
 }
