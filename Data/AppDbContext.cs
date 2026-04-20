@@ -14,7 +14,6 @@ public class AppDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid
     public DbSet<Permission> Permissions { get; set; }
     public DbSet<UserGroup> UserGroups { get; set; }
     public DbSet<GroupPermission> GroupPermissions { get; set; }
-
     public DbSet<Customer> Customers { get; set; }
     public DbSet<Currency> Currencies { get; set; }
     public DbSet<InstallmentContract> InstallmentContracts { get; set; }

@@ -32,7 +32,6 @@ public static class DbInitializer
             context.Permissions.AddRange(newPermissions);
             await context.SaveChangesAsync();
         }
-
         // 2. Ensure Admin Group exists
         var adminGroup = await context.Groups.FirstOrDefaultAsync(g => g.Name == "Admin");
         if (adminGroup == null)
