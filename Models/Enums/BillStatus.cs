@@ -1,8 +1,8 @@
 namespace InstallmentSystem.Models.Enums;
 
-public enum ContractStatus
+public enum BillStatus
 {
     Active,
-    Completed,
+    Paid,
     Cancelled
 }

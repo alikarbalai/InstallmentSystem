@@ -11,24 +11,24 @@ using InstallmentSystem.Authorization;
 namespace InstallmentSystem.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/Bills")]
 [Authorize]
-public class ContractsController : ControllerBase
+public class BillsController : ControllerBase
 {
     private readonly AppDbContext _db;
-    private readonly IContractService _service;
+    private readonly IBillService _service;
 
-    public ContractsController(AppDbContext db, IContractService service)
+    public BillsController(AppDbContext db, IBillService service)
     {
         _db = db;
         _service = service;
     }
 
     [HttpGet]
-    [HasPermission("Contract.Read")]
-    public async Task<IActionResult> GetAll([FromQuery] ContractStatus? status, [FromQuery] Guid? customerId)
+    [HasPermission("Bill.Read")]
+    public async Task<IActionResult> GetAll([FromQuery] BillStatus? status, [FromQuery] Guid? customerId)
     {
-        var query = _db.InstallmentContracts
+        var query = _db.InstallmentBills
             .Include(c => c.Customer)
             .Include(c => c.Currency)
             .Include(c => c.Installments)
@@ -37,10 +37,10 @@ public class ContractsController : ControllerBase
         if (status.HasValue) query = query.Where(c => c.Status == status);
         if (customerId.HasValue)           query = query.Where(c => c.CustomerId == customerId);
 
-        var contracts = await query
+        var bills = await query
             .OrderByDescending(c => c.CreatedAt)
             .Select(c => new {
-                c.Id, c.ContractNumber, c.ContractDate, c.TotalAmount,
+                c.Id, c.BillNumber, c.BillDate, c.TotalAmount,
                 c.TotalAmountInBase, c.DownPayment, c.RemainingAmount,
                 c.InstallmentCount, c.InstallmentValue, c.ExchangeRate,
                 c.Status, c.CreatedAt,
@@ -51,13 +51,13 @@ public class ContractsController : ControllerBase
                 OverdueInstallments = c.Installments.Count(i => i.Status == InstallmentStatus.Overdue)
             }).ToListAsync();
 
-        return Ok(contracts);
+        return Ok(bills);
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var contract = await _db.InstallmentContracts
+        var bill = await _db.InstallmentBills
             .Include(c => c.Customer)
             .Include(c => c.Currency)
             .Include(c => c.Installments)
@@ -65,17 +65,17 @@ public class ContractsController : ControllerBase
             .Include(c => c.Payments).ThenInclude(p => p.Receipt).ThenInclude(r => r!.Currency)
             .FirstOrDefaultAsync(c => c.Id == id);
 
-        if (contract == null) return NotFound();
-        return Ok(contract);
+        if (bill == null) return NotFound();
+        return Ok(bill);
     }
 
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CreateContractDto dto)
+    public async Task<IActionResult> Create([FromBody] CreateBillDto dto)
     {
         try
         {
-            var contract = await _service.CreateContractAsync(dto);
-            return CreatedAtAction(nameof(GetById), new { id = contract.Id }, contract);
+            var bill = await _service.CreateBillAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = bill.Id }, bill);
         }
         catch (Exception ex)
         {
@@ -84,16 +84,16 @@ public class ContractsController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateContractDto dto)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateBillDto dto)
     {
-        var contract = await _db.InstallmentContracts
+        var bill = await _db.InstallmentBills
             .Include(c => c.Installments)
             .Include(c => c.ContractItems)
             .FirstOrDefaultAsync(c => c.Id == id);
 
-        if (contract == null) return NotFound();
-        if (contract.Status != ContractStatus.Active)
-            return BadRequest(new { message = "لا يمكن تعديل عقد غير نشط" });
+        if (bill == null) return NotFound();
+        if (bill.Status != BillStatus.Active)
+            return BadRequest(new { message = "لا يمكن تعديل فاتورة غير نشطة" });
 
         var currency = await _db.Currencies.FindAsync(dto.CurrencyId)
             ?? await _db.Currencies.FirstAsync(c => c.IsBase);

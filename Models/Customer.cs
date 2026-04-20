@@ -9,6 +9,6 @@ public class Customer
     public string NationalId { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    public ICollection<InstallmentContract> Contracts { get; set; } = new List<InstallmentContract>();
+    public ICollection<InstallmentBill> Bills { get; set; } = new List<InstallmentBill>();
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }

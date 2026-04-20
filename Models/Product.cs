@@ -7,5 +7,5 @@ public class Product
     public decimal Price { get; set; }
     public string? Description { get; set; }
 
-    public ICollection<ContractItem> ContractItems { get; set; } = new List<ContractItem>();
+    public ICollection<BillItem> BillItems { get; set; } = new List<BillItem>();
 }

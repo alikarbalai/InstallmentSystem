@@ -6,7 +6,7 @@ namespace InstallmentSystem.Models;
 public class Installment
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid ContractId { get; set; }
+    public Guid BillId { get; set; }
     public int InstallmentNumber { get; set; }
     public DateTime DueDate { get; set; }
     public decimal Amount { get; set; }
@@ -18,6 +18,6 @@ public class Installment
     [Timestamp]
     public byte[]? RowVersion { get; set; }
 
-    public InstallmentContract Contract { get; set; } = null!;
+    public InstallmentBill Bill { get; set; } = null!;
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }

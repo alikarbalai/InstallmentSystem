@@ -3,13 +3,13 @@ using InstallmentSystem.Models.Enums;
 
 namespace InstallmentSystem.Models;
 
-public class InstallmentContract
+public class InstallmentBill
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid CustomerId { get; set; }
     public Guid CurrencyId { get; set; }
-    public string ContractNumber { get; set; } = string.Empty;
-    public DateTime ContractDate { get; set; }
+    public string BillNumber { get; set; } = string.Empty;
+    public DateTime BillDate { get; set; }
     public decimal TotalAmount { get; set; }           // بعملة العقد
     public decimal TotalAmountInBase { get; set; }     // بالدينار العراقي
     public decimal DownPayment { get; set; }
@@ -17,7 +17,7 @@ public class InstallmentContract
     public int InstallmentCount { get; set; }
     public decimal InstallmentValue { get; set; }
     public decimal ExchangeRate { get; set; } = 1;
-    public ContractStatus Status { get; set; } = ContractStatus.Active;
+    public BillStatus Status { get; set; } = BillStatus.Active;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     [Timestamp]
@@ -27,5 +27,5 @@ public class InstallmentContract
     public Currency Currency { get; set; } = null!;
     public ICollection<Installment> Installments { get; set; } = new List<Installment>();
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
-    public ICollection<ContractItem> ContractItems { get; set; } = new List<ContractItem>();
+    public ICollection<BillItem> BillItems { get; set; } = new List<BillItem>();
 }
